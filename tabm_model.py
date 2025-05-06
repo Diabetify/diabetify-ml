@@ -11,6 +11,8 @@ import math
 from sklearn.metrics import roc_auc_score, accuracy_score
 from base_model import Model, make_parameter_groups
 
+
+
 #############################################
 # Base Class for TabM Models (Regressor/Classifer)
 #############################################
@@ -58,6 +60,8 @@ class TabMBase(BaseEstimator):
         X_cont = torch.tensor(X_cont, dtype=torch.float32, device=self.device)
 
         if y is not None:
+            if not isinstance(y, np.ndarray):  
+              y = y.to_numpy()  
             y = torch.tensor(y, dtype=torch.float32, device=self.device)
 
         return X_cat, X_cont, y
@@ -191,3 +195,37 @@ class TabMClassifier(TabMBase):
     def predict(self, X):
         probs = self.predict_proba(X)
         return np.argmax(probs, axis=1)
+
+    def update(self, X_new, y_new, epochs=5):
+
+      X_cat, X_cont, y_new = self._preprocess(X_new, y_new, fit=False)
+      y_new = y_new.to(torch.long)
+
+      if X_cat is None:
+          train_dataset = TensorDataset(X_cont, y_new)
+          def collate_fn(batch):
+              X_cont_batch, y_batch = zip(*batch)
+              return torch.stack(X_cont_batch), None, torch.stack(y_batch)
+      else:
+          train_dataset = TensorDataset(X_cont, X_cat, y_new)
+          collate_fn = None
+
+      train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True, collate_fn=collate_fn)
+
+      optimizer = AdamW(make_parameter_groups(self.model), lr=self.learning_rate)
+      criterion = nn.CrossEntropyLoss()
+
+      self.model.train()
+      for epoch in range(epochs):
+          total_loss = 0.0
+          for batch in train_loader:
+              batch_X_cont, batch_X_cat, batch_y = batch
+              optimizer.zero_grad()
+              logits = self.model(batch_X_cont, batch_X_cat)
+              if logits.ndim == 3:
+                  logits = logits.mean(dim=1)
+              loss = criterion(logits, batch_y.squeeze())
+              loss.backward()
+              optimizer.step()
+              total_loss += loss.item()
+          print(f"[Update] Epoch {epoch + 1}/{epochs}, Loss: {total_loss / len(train_loader):.4f}")
