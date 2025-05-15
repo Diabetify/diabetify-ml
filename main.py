@@ -1,22 +1,14 @@
-import sys
 import pickle
 import shap
 import numpy as np
 from fastapi import FastAPI
 from pydantic import BaseModel
 import pandas as pd
-import base_model
-import tabm_model
 import time
+import xgboost as xgb
 from sklearn.metrics import roc_auc_score, precision_recall_curve, auc
 
-sys.modules["__main__"] = tabm_model
-tabm_model.MLP = base_model.MLP 
-tabm_model.Model = base_model.Model
-tabm_model.ScaleEnsemble = base_model.ScaleEnsemble
-tabm_model.NLinear = base_model.NLinear
-
-with open("tabm_model.pkl", "rb") as f:
+with open("xg_model.pkl", "rb") as f:
     model = pickle.load(f)
 
 with open('x_columns.pkl', 'rb') as f:
@@ -85,47 +77,50 @@ def predict(req: PredictRequest):
 
 @app.post("/update")
 def update_model(req: UpdateRequest):
+    global model
 
     start_time = time.time()
 
-    old_state = {k: v.clone() for k, v in model.model.state_dict().items()}
+    X_new = X_test
+    y_new = y_test
+    X_val = X_test
+    y_val = y_test
 
-    probs_before = model.predict_proba(req.X_val)
-    auc_before = roc_auc_score(req.y_val, probs_before[:, 1])
-    prec, recall, _ = precision_recall_curve(req.y_val, probs_before[:, 1])
+    model.save_model("temp_backup_model.json")
+
+    probs_before = model.predict_proba(X_val)
+    auc_before = roc_auc_score(y_val, probs_before[:, 1])
+    prec, recall, _ = precision_recall_curve(y_val, probs_before[:, 1])
     pr_auc_before = auc(recall, prec)
 
-    model.update(req.X_new, req.y_new, epochs=req.epochs)
+    new_model = xgb.XGBClassifier(**model.get_params())
+    new_model.fit(
+        X_new,
+        y_new,
+        xgb_model=model.get_booster(),
+        verbose=False,
+    )
 
-    probs_after = model.predict_proba(req.X_val)
-    auc_after = roc_auc_score(req.y_val, probs_after[:, 1])
-    prec, recall, _ = precision_recall_curve(req.y_val, probs_after[:, 1])
+    probs_after = new_model.predict_proba(X_val)
+    auc_after = roc_auc_score(y_val, probs_after[:, 1])
+    prec, recall, _ = precision_recall_curve(y_val, probs_after[:, 1])
     pr_auc_after = auc(recall, prec)
 
     if auc_after < auc_before or pr_auc_after < pr_auc_before:
-
-        model.model.load_state_dict(old_state)
-
-        elapsed_time = time.time() - start_time
-        return {
-            "status": "reverted",
-            "auc_before": auc_before,
-            "auc_after": auc_after,
-            "pr_auc_before": pr_auc_before,
-            "pr_auc_after": pr_auc_after,
-            "elapsed_time_seconds": round(elapsed_time, 4)
-        }
+        model.load_model("temp_backup_model.json")
+        status = "reverted"
     else:
-        with open("tabm_model.pkl", "wb") as f:
-            pickle.dump(model, f)
-        
-        elapsed_time = time.time() - start_time
+        with open("xg_model.pkl", "wb") as f:
+            pickle.dump(new_model, f)
+        status = "updated"
+        model = new_model
 
-        return {
-            "status": "updated",
-            "auc_before": auc_before,
-            "auc_after": auc_after,
-            "pr_auc_before": pr_auc_before,
-            "pr_auc_after": pr_auc_after,
-            "elapsed_time_seconds": round(elapsed_time, 4)
-        }
+    elapsed_time = time.time() - start_time
+    return {
+        "status": status,
+        "auc_before": auc_before,
+        "auc_after": auc_after,
+        "pr_auc_before": pr_auc_before,
+        "pr_auc_after": pr_auc_after,
+        "elapsed_time_seconds": round(elapsed_time, 4)
+    }
