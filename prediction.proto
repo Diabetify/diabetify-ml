@@ -6,7 +6,6 @@ option go_package = "diabetify/internal/proto/prediction";
 
 service PredictionService {
   rpc Predict(PredictionRequest) returns (PredictionResponse) {}
-  rpc UpdateModel(UpdateModelRequest) returns (UpdateModelResponse) {}
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse) {}
 }
 
@@ -26,26 +25,8 @@ message PredictionResponse {
   string timestamp = 4;
 }
 
-message UpdateModelRequest {
-  repeated FeatureVector X_new = 1;
-  repeated double y_new = 2;
-  repeated FeatureVector X_val = 3;
-  repeated double y_val = 4;
-  int32 epochs = 5;
-}
-
 message FeatureVector {
   repeated double values = 1;
-}
-
-message UpdateModelResponse {
-  string status = 1;
-  double auc_before = 2;
-  double auc_after = 3;
-  double pr_auc_before = 4;
-  double pr_auc_after = 5;
-  double elapsed_time = 6;
-  string timestamp = 7;
 }
 
 message HealthCheckRequest {}

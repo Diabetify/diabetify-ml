@@ -26,9 +26,6 @@ try:
     with open('x_columns.pkl', 'rb') as f:
         x_columns = pickle.load(f)
 
-    X_test = pd.read_csv("./X_test.csv")
-    y_test = pd.read_csv("./y_test.csv")
-
     background = pd.read_parquet("shap_background.parquet")
     
     logger.info("Successfully loaded model and data files")
@@ -85,55 +82,6 @@ def make_prediction(features):
         "elapsed_time_seconds": round(elapsed_time, 4)
     }
 
-def update_model_function(X_new, y_new, X_val, y_val, epochs=5):
-    global model
-
-    start_time = time.time()
-
-    X_new_df = pd.DataFrame(X_new, columns=x_columns)
-    y_new_series = pd.Series(y_new)
-    X_val_df = pd.DataFrame(X_val, columns=x_columns)
-    y_val_series = pd.Series(y_val)
-
-    model.save_model("temp_backup_model.json")
-
-    probs_before = model.predict_proba(X_val_df)
-    auc_before = roc_auc_score(y_val_series, probs_before[:, 1])
-    prec, recall, _ = precision_recall_curve(y_val_series, probs_before[:, 1])
-    pr_auc_before = auc(recall, prec)
-
-    new_model = xgb.XGBClassifier(**model.get_params())
-    new_model.fit(
-        X_new_df,
-        y_new_series,
-        xgb_model=model.get_booster(),
-        verbose=False,
-    )
-
-    probs_after = new_model.predict_proba(X_val_df)
-    auc_after = roc_auc_score(y_val_series, probs_after[:, 1])
-    prec, recall, _ = precision_recall_curve(y_val_series, probs_after[:, 1])
-    pr_auc_after = auc(recall, prec)
-
-    if auc_after < auc_before or pr_auc_after < pr_auc_before:
-        model.load_model("temp_backup_model.json")
-        status = "reverted"
-    else:
-        with open("xg_model.pkl", "wb") as f:
-            pickle.dump(new_model, f)
-        status = "updated"
-        model = new_model
-
-    elapsed_time = time.time() - start_time
-    return {
-        "status": status,
-        "auc_before": float(auc_before),
-        "auc_after": float(auc_after),
-        "pr_auc_before": float(pr_auc_before),
-        "pr_auc_after": float(pr_auc_after),
-        "elapsed_time_seconds": round(elapsed_time, 4)
-    }
-
 class PredictionServicer(prediction_pb2_grpc.PredictionServiceServicer):
     def Predict(self, request, context):
         logger.info(f"gRPC predict request received with {len(request.features)} features")
@@ -162,32 +110,6 @@ class PredictionServicer(prediction_pb2_grpc.PredictionServiceServicer):
             context.set_details(f"Prediction failed: {str(e)}")
             return prediction_pb2.PredictionResponse()
         
-    def UpdateModel(self, request, context):
-        logger.info("gRPC update model request received")
-        
-        try:
-            X_new = [[float(val) for val in feature.values] for feature in request.X_new]
-            y_new = list(request.y_new)
-            X_val = [[float(val) for val in feature.values] for feature in request.X_val]
-            y_val = list(request.y_val)
-            epochs = request.epochs
-            
-            result = update_model_function(X_new, y_new, X_val, y_val, epochs)
-            
-            return prediction_pb2.UpdateModelResponse(
-                status=result["status"],
-                auc_before=result["auc_before"],
-                auc_after=result["auc_after"],
-                pr_auc_before=result["pr_auc_before"],
-                pr_auc_after=result["pr_auc_after"],
-                elapsed_time=result["elapsed_time_seconds"],
-                timestamp=datetime.datetime.now().isoformat()
-            )
-        except Exception as e:
-            logger.error(f"Error in UpdateModel: {e}")
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(f"Model update failed: {str(e)}")
-            return prediction_pb2.UpdateModelResponse()
         
     def HealthCheck(self, request, context):
         return prediction_pb2.HealthCheckResponse(
