@@ -39,11 +39,6 @@ class PredictionServiceStub(object):
                 request_serializer=prediction__pb2.PredictionRequest.SerializeToString,
                 response_deserializer=prediction__pb2.PredictionResponse.FromString,
                 _registered_method=True)
-        self.UpdateModel = channel.unary_unary(
-                '/prediction.PredictionService/UpdateModel',
-                request_serializer=prediction__pb2.UpdateModelRequest.SerializeToString,
-                response_deserializer=prediction__pb2.UpdateModelResponse.FromString,
-                _registered_method=True)
         self.HealthCheck = channel.unary_unary(
                 '/prediction.PredictionService/HealthCheck',
                 request_serializer=prediction__pb2.HealthCheckRequest.SerializeToString,
@@ -55,12 +50,6 @@ class PredictionServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def Predict(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def UpdateModel(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -79,11 +68,6 @@ def add_PredictionServiceServicer_to_server(servicer, server):
                     servicer.Predict,
                     request_deserializer=prediction__pb2.PredictionRequest.FromString,
                     response_serializer=prediction__pb2.PredictionResponse.SerializeToString,
-            ),
-            'UpdateModel': grpc.unary_unary_rpc_method_handler(
-                    servicer.UpdateModel,
-                    request_deserializer=prediction__pb2.UpdateModelRequest.FromString,
-                    response_serializer=prediction__pb2.UpdateModelResponse.SerializeToString,
             ),
             'HealthCheck': grpc.unary_unary_rpc_method_handler(
                     servicer.HealthCheck,
@@ -118,33 +102,6 @@ class PredictionService(object):
             '/prediction.PredictionService/Predict',
             prediction__pb2.PredictionRequest.SerializeToString,
             prediction__pb2.PredictionResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def UpdateModel(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/prediction.PredictionService/UpdateModel',
-            prediction__pb2.UpdateModelRequest.SerializeToString,
-            prediction__pb2.UpdateModelResponse.FromString,
             options,
             channel_credentials,
             insecure,

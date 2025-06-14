@@ -14,9 +14,6 @@ with open("xg_model.pkl", "rb") as f:
 with open('x_columns.pkl', 'rb') as f:
     x_columns = pickle.load(f)
 
-X_test = pd.read_csv("./X_test.csv")
-y_test = pd.read_csv("./y_test.csv")
-
 background = pd.read_parquet("shap_background.parquet")
 
 def predict_proba_wrapper(X):
@@ -30,13 +27,6 @@ app = FastAPI()
 
 class PredictRequest(BaseModel):
     features: list
-
-class UpdateRequest(BaseModel):
-    X_new: list[list] = X_test
-    y_new: list = y_test
-    X_val: list[list] = X_test
-    y_val: list = y_test
-    epochs: int = 5
 
 @app.post("/predict")
 def predict(req: PredictRequest):
@@ -72,55 +62,5 @@ def predict(req: PredictRequest):
     return {
         "prediction": float(prediction[1]),
         "explanation": explanation_dict_sorted,
-        "elapsed_time_seconds": round(elapsed_time, 4)
-    }
-
-@app.post("/update")
-def update_model(req: UpdateRequest):
-    global model
-
-    start_time = time.time()
-
-    X_new = X_test
-    y_new = y_test
-    X_val = X_test
-    y_val = y_test
-
-    model.save_model("temp_backup_model.json")
-
-    probs_before = model.predict_proba(X_val)
-    auc_before = roc_auc_score(y_val, probs_before[:, 1])
-    prec, recall, _ = precision_recall_curve(y_val, probs_before[:, 1])
-    pr_auc_before = auc(recall, prec)
-
-    new_model = xgb.XGBClassifier(**model.get_params())
-    new_model.fit(
-        X_new,
-        y_new,
-        xgb_model=model.get_booster(),
-        verbose=False,
-    )
-
-    probs_after = new_model.predict_proba(X_val)
-    auc_after = roc_auc_score(y_val, probs_after[:, 1])
-    prec, recall, _ = precision_recall_curve(y_val, probs_after[:, 1])
-    pr_auc_after = auc(recall, prec)
-
-    if auc_after < auc_before or pr_auc_after < pr_auc_before:
-        model.load_model("temp_backup_model.json")
-        status = "reverted"
-    else:
-        with open("xg_model.pkl", "wb") as f:
-            pickle.dump(new_model, f)
-        status = "updated"
-        model = new_model
-
-    elapsed_time = time.time() - start_time
-    return {
-        "status": status,
-        "auc_before": auc_before,
-        "auc_after": auc_after,
-        "pr_auc_before": pr_auc_before,
-        "pr_auc_after": pr_auc_after,
         "elapsed_time_seconds": round(elapsed_time, 4)
     }
