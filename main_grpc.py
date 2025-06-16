@@ -3,8 +3,6 @@ import shap
 import numpy as np
 import pandas as pd
 import time
-import xgboost as xgb
-from sklearn.metrics import roc_auc_score, precision_recall_curve, auc
 import grpc
 import concurrent.futures
 import datetime
@@ -25,21 +23,14 @@ try:
 
     with open('x_columns.pkl', 'rb') as f:
         x_columns = pickle.load(f)
-
-    background = pd.read_parquet("shap_background.parquet")
     
     logger.info("Successfully loaded model and data files")
 except Exception as e:
     logger.error(f"Error loading model or data files: {e}")
     sys.exit(1)
 
-def predict_proba_wrapper(X):
-    if isinstance(X, (np.ndarray, list)):
-        X = pd.DataFrame(X, columns=x_columns)
-    return model.predict_proba(X)
-
 # Create SHAP explainer
-explainer = shap.KernelExplainer(predict_proba_wrapper, background)
+explainer = shap.TreeExplainer(model)
 logger.info("SHAP explainer initialized")
 
 def make_prediction(features):
