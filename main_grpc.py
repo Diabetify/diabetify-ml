@@ -45,16 +45,11 @@ logger.info("SHAP explainer initialized")
 def make_prediction(features):
     start_time = time.time()
 
-    X = np.array([features])
-
-    if isinstance(X, (np.ndarray, list)):
-        X = pd.DataFrame(X, columns=x_columns)
+    X = pd.DataFrame([features], columns=x_columns)
     prediction = model.predict_proba(X)[0]
-
-    sample_np = X.to_numpy().reshape(1, -1)
     try:
-        shap_values_single = explainer.shap_values(sample_np)[0]
-        abs_shap_single = np.abs(shap_values_single[:,1])
+        shap_values_single = explainer.shap_values(X)
+        abs_shap_single = np.abs(shap_values_single[0])
         abs_shap_single /= abs_shap_single.sum()
 
         explanation_items = [
@@ -62,10 +57,10 @@ def make_prediction(features):
                 feature,
                 {
                     "contribution": float(contribution),
-                    "impact": 1 if shap[1] > 0 else 0
+                    "impact": 1 if shap > 0 else 0
                 }
             )
-            for feature, shap, contribution in zip(x_columns, shap_values_single, abs_shap_single)
+            for feature, shap, contribution in zip(x_columns, shap_values_single[0], abs_shap_single)
         ]
 
         explanation_items_sorted = sorted(explanation_items, key=lambda x: x[1]["contribution"], reverse=True)
