@@ -5,21 +5,12 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import pandas as pd
 import time
-import xgboost as xgb
-from sklearn.metrics import roc_auc_score, precision_recall_curve, auc
 
 with open("xg_model.pkl", "rb") as f:
     model = pickle.load(f)
 
 with open('x_columns.pkl', 'rb') as f:
     x_columns = pickle.load(f)
-
-background = pd.read_parquet("shap_background.parquet")
-
-def predict_proba_wrapper(X):
-    if isinstance(X, (np.ndarray, list)):
-        X = pd.DataFrame(X, columns=x_columns)
-    return model.predict_proba(X)
 
 # explainer = shap.KernelExplainer(predict_proba_wrapper, background)
 explainer = shap.TreeExplainer(model)
