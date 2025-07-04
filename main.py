@@ -12,8 +12,10 @@ with open("xg_model.pkl", "rb") as f:
 with open('x_columns.pkl', 'rb') as f:
     x_columns = pickle.load(f)
 
+background = pd.read_parquet("shap_background.parquet")
+
 # explainer = shap.KernelExplainer(predict_proba_wrapper, background)
-explainer = shap.TreeExplainer(model)
+explainer = shap.TreeExplainer(model, feature_perturbation="tree_path_dependent")
 
 app = FastAPI()
 
@@ -34,6 +36,7 @@ def predict(req: PredictRequest):
         (
             feature,
             {
+                "shap_value": float(shap),
                 "contribution": float(contribution),
                 "impact": 1 if shap > 0 else 0
             }
