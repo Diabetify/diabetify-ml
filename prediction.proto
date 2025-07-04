@@ -14,8 +14,9 @@ message PredictionRequest {
 }
 
 message FeatureExplanation {
-  double contribution = 1;
-  int32 impact = 2;
+  double shap = 1;
+  double contribution = 2;
+  int32 impact = 3;
 }
 
 message PredictionResponse {
