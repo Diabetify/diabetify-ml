@@ -47,7 +47,7 @@ def make_prediction(features):
             (
                 feature,
                 {
-                    "shap_value": float(shap),
+                    "shap": float(shap),
                     "contribution": float(contribution),
                     "impact": 1 if shap > 0 else 0
                 }
