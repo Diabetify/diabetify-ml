@@ -80,6 +80,7 @@ class PredictionServicer(prediction_pb2_grpc.PredictionServiceServicer):
             explanation_pb = {}
             for feature_name, explanation_data in result["explanation"].items():
                 feature_explanation = prediction_pb2.FeatureExplanation(
+                    shap=explanation_data["shap"],
                     contribution=explanation_data["contribution"],
                     impact=explanation_data["impact"]
                 )
