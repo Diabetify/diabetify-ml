@@ -136,7 +136,8 @@ class AsyncMLService:
                 explanation_dict[safe_feature_name] = {
                     "shap": safe_shap,
                     "contribution": safe_contribution,
-                    "impact": safe_impact
+                    "impact": safe_impact,
+                    "value": features[i]
                 }
 
             elapsed_time = time.time() - start_time
